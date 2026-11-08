@@ -5,7 +5,7 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && rm -rf site && mkdir -p site && cp -r index.html styles.css dist site/",
     "dev": "tsc --watch"
   },
   "devDependencies": {
