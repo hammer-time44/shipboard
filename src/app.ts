@@ -26,6 +26,13 @@
   ];
   const STORE_KEY = "shipboard-v1";
 
+  const ICON = {
+    plus: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`,
+    x: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>`,
+    check: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>`,
+    cal: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" rx="3"/><path d="M8 3.5v4M16 3.5v4M4 10h16"/></svg>`,
+  };
+
   const iso = (offsetDays: number): string => {
     const x = new Date();
     x.setDate(x.getDate() + offsetDays);
@@ -44,6 +51,7 @@
   let nextId = 50;
   let dragId: number | null = null;
   let query = "";
+  const tagFilter = new Set<TagKey>();
   let current: Task | null = null;
 
   try {
@@ -70,7 +78,7 @@
     el.className = "col";
     el.dataset.c = c.id;
     el.style.setProperty("--c", c.c);
-    el.innerHTML = `<div class="ch"><span class="dot"></span><h2>${c.t}</h2><span class="n"></span><button class="ib" aria-label="Add card to ${c.t}">+</button></div>
+    el.innerHTML = `<div class="ch"><span class="dot"></span><h2>${c.t}</h2><span class="n"></span><span class="sp"></span><button class="ib" aria-label="Add card to ${c.t}">${ICON.plus}</button></div>
     <div class="addf"><textarea rows="2" placeholder="Name this card" aria-label="New card"></textarea><div class="row" style="margin:0"><button class="btn">Add card</button><button class="btn g">Cancel</button></div></div><div class="cards"></div>`;
     board.appendChild(el);
 
@@ -134,11 +142,14 @@
       const el = board.querySelector<HTMLElement>(`[data-c="${c.id}"]`)!;
       const box = el.querySelector<HTMLElement>(".cards")!;
       const list = tasks.filter(
-        (t) => t.col === c.id && (!ql || t.title.toLowerCase().includes(ql) || t.tags.some((g) => TG[g][0].toLowerCase().includes(ql))),
+        (t) =>
+          t.col === c.id &&
+          (!ql || t.title.toLowerCase().includes(ql) || t.tags.some((g) => TG[g][0].toLowerCase().includes(ql))) &&
+          (!tagFilter.size || t.tags.some((g) => tagFilter.has(g))),
       );
       el.querySelector(".n")!.textContent = String(list.length);
       box.innerHTML = "";
-      if (!list.length) box.innerHTML = `<div class="empty">${ql ? "No matching cards." : c.h}</div>`;
+      if (!list.length) box.innerHTML = `<div class="empty">${ql || tagFilter.size ? "No matching cards." : c.h}</div>`;
 
       list.forEach((t) => {
         const k = document.createElement("article");
@@ -151,10 +162,15 @@
         const dateText = t.due
           ? new Date(t.due + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" })
           : "";
-        k.innerHTML = `<h3>${esc(t.title)}</h3><div class="meta">${t.tags
-          .map((g) => `<span class="tg" style="--c:${TG[g][1]}">${TG[g][0]}</span>`)
-          .join("")}${dateText ? `<span class="${late ? "late" : ""}">${late ? "Overdue · " : ""}${dateText}</span>` : ""}${
-          t.chk.length ? `<span>${doneCount}/${t.chk.length}</span>` : ""
+        const pct = t.chk.length ? Math.round((doneCount / t.chk.length) * 100) : 0;
+        k.innerHTML = `${c.id === "done" ? `<span class="ok">${ICON.check}</span>` : ""}<h3>${esc(t.title)}</h3>${
+          t.desc ? `<p class="d">${esc(t.desc)}</p>` : ""
+        }<div class="meta">${t.tags
+          .map((g) => `<span class="pill tg" style="--c:${TG[g][1]}">${TG[g][0]}</span>`)
+          .join("")}${
+          dateText ? `<span class="pill${late ? " late" : ""}">${ICON.cal}${late ? "Overdue · " : ""}${dateText}</span>` : ""
+        }${
+          t.chk.length ? `<span class="prg"><i><b style="width:${pct}%"></b></i>${doneCount}/${t.chk.length}</span>` : ""
         }</div>`;
         k.ondragstart = (e) => {
           dragId = t.id;
@@ -172,11 +188,50 @@
         box.appendChild(k);
       });
     });
-    const done = tasks.filter((t) => t.col === "done").length;
-    $("#pct").textContent = `${done} of ${tasks.length} done`;
-    $("#fill").style.width = (tasks.length ? (done / tasks.length) * 100 : 0) + "%";
+    renderStats();
     save();
   }
+
+  function renderStats(): void {
+    const total = tasks.length;
+    const done = tasks.filter((t) => t.col === "done").length;
+    const today = iso(0);
+    const weekEnd = iso(7);
+    const open = tasks.filter((t) => t.col !== "done" && t.due);
+    const over = open.filter((t) => t.due < today).length;
+    const week = open.filter((t) => t.due >= today && t.due <= weekEnd).length;
+
+    $("#ringText").textContent = `${done}/${total}`;
+    $("#ringLabel").setAttribute("aria-label", `${done} of ${total} cards done`);
+    const C = 2 * Math.PI * 33;
+    $("#ring").style.strokeDashoffset = String(C * (1 - (total ? done / total : 0)));
+    $("#sOver").textContent = String(over);
+    $("#sOver").style.color = over ? "var(--fix)" : "";
+    $("#sOverSub").textContent = over ? (over === 1 ? "Needs attention" : "Need attention") : "Nothing late";
+    $("#sWeek").textContent = String(week);
+
+    const counts = COLS.map((c) => tasks.filter((t) => t.col === c.id).length);
+    const max = Math.max(1, ...counts);
+    $("#bars").innerHTML = COLS.map(
+      (c, i) => `<div style="--c:${c.c}"><span>${counts[i]}</span><i style="height:${Math.max(10, (counts[i] / max) * 100)}%"></i></div>`,
+    ).join("");
+  }
+
+  const chipsEl = $<HTMLElement>("#chips");
+  (Object.keys(TG) as TagKey[]).forEach((k) => {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.setAttribute("aria-pressed", "false");
+    b.innerHTML = `${ICON.check}${TG[k][0]}`;
+    b.onclick = () => {
+      if (tagFilter.has(k)) tagFilter.delete(k); else tagFilter.add(k);
+      b.classList.toggle("on", tagFilter.has(k));
+      b.setAttribute("aria-pressed", String(tagFilter.has(k)));
+      render();
+    };
+    chipsEl.appendChild(b);
+  });
+  $("#today").textContent = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
 
   function openDrawer(id: number): void {
     const t = tasks.find((x) => x.id === id);
@@ -196,14 +251,19 @@
   function draw(): void {
     const t = current;
     if (!t) return;
-    drawer.innerHTML = `<input class="t" type="text" value="${esc(t.title)}" aria-label="Card title">
-    <h4>Status</h4><div class="seg">${COLS.map((c) => `<button class="opt ${c.id === t.col ? "on" : ""}" data-c="${c.id}">${c.t}</button>`).join("")}</div>
+    const colDef = COLS.find((c) => c.id === t.col)!;
+    const doneN = t.chk.filter((x) => x.d).length;
+    const pct = t.chk.length ? Math.round((doneN / t.chk.length) * 100) : 0;
+    drawer.innerHTML = `<div class="dh"><span class="stat" style="--c:${colDef.c}"><span class="dot"></span>${colDef.t}</span><button class="ib" id="xx" aria-label="Close">${ICON.x}</button></div>
+    <input class="t" type="text" value="${esc(t.title)}" aria-label="Card title">
+    <h4>Status</h4><div class="seg track" role="group" aria-label="Status">${COLS.map((c) => `<button class="opt sg ${c.id === t.col ? "on" : ""}" data-c="${c.id}">${c.id === "fix" ? "To fix" : c.t}</button>`).join("")}</div>
     <h4>Description</h4><textarea id="ds" placeholder="Add more detail…">${esc(t.desc)}</textarea>
-    <h4>Tags</h4><div class="seg">${(Object.keys(TG) as TagKey[]).map((k) => `<button class="opt ${t.tags.includes(k) ? "on" : ""}" data-g="${k}">${TG[k][0]}</button>`).join("")}</div>
+    <h4>Tags</h4><div class="seg">${(Object.keys(TG) as TagKey[]).map((k) => `<button class="opt ${t.tags.includes(k) ? "on" : ""}" data-g="${k}" aria-pressed="${t.tags.includes(k)}">${ICON.check}${TG[k][0]}</button>`).join("")}</div>
     <h4>Due date</h4><input type="date" id="dd" value="${t.due}">
-    <h4>Checklist</h4>${t.chk.map((x, i) => `<label class="chk ${x.d ? "d" : ""}"><input type="checkbox" data-i="${i}" ${x.d ? "checked" : ""}><span>${esc(x.t)}</span></label>`).join("")}
-    <div class="row"><input type="text" id="ci" placeholder="Add an item"><button class="btn" id="cb">Add</button></div>
-    <div class="row" style="margin-top:32px"><button class="btn r" id="del">Delete card</button><span style="flex:1"></span><button class="btn" id="x">Done</button></div>`;
+    <h4>Checklist${t.chk.length ? `<span>${doneN}/${t.chk.length}</span>` : ""}</h4>
+    ${t.chk.length ? `<div class="bar"><b style="width:${pct}%"></b></div>` : ""}${t.chk.map((x, i) => `<label class="chk ${x.d ? "d" : ""}"><input type="checkbox" data-i="${i}" ${x.d ? "checked" : ""}><span>${esc(x.t)}</span></label>`).join("")}
+    <div class="row add"><input type="text" id="ci" placeholder="Add an item" aria-label="New checklist item"><button class="btn" id="cb">Add</button></div>
+    <div class="row foot"><button class="btn r" id="del">Delete card</button><span style="flex:1"></span><button class="btn" id="x">Done</button></div>`;
 
     drawer.querySelector<HTMLInputElement>(".t")!.oninput = (e) => { t.title = (e.target as HTMLInputElement).value || "Untitled"; };
     $<HTMLTextAreaElement>("#ds").oninput = (e) => { t.desc = (e.target as HTMLTextAreaElement).value; };
@@ -240,6 +300,7 @@
     $<HTMLInputElement>("#ci").onkeydown = (e) => { if (e.key === "Enter") addItem(); };
     $("#del").onclick = () => { tasks = tasks.filter((x) => x !== t); closeDrawer(); };
     $("#x").onclick = closeDrawer;
+    $("#xx").onclick = closeDrawer;
   }
 
   scrim.onclick = closeDrawer;
