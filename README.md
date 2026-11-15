@@ -1,35 +1,28 @@
-# ShipBoard
+# Shipboard
 
-A three-column kanban board (To fix / update, In progress, Done) built with Next.js 16 (App Router), React 19 and TypeScript. Black glassmorphism UI with fluid motion.
+A three-column kanban board: To fix / update, In progress, Done.
 
 ## Run
 
-```bash
-npm install
-npm run dev      # http://localhost:3000
-npm run build && npm start
 ```
+npm install
+npm run build
+```
+
+Then open `index.html` in a browser. Use `npm run dev` to rebuild on save.
+
 
 ## Features
 
-- Drag cards between columns and reorder them; cards glide to their new position
-- Click a card to edit title, status, description, tags, due date and checklist
-- Search (press `/`) and filter by tag
-- Summary tiles: progress ring, overdue, due this week, cards per column
-- Data is saved in your browser's `localStorage`
-- Respects `prefers-reduced-motion` and `prefers-reduced-transparency`
-
-## Structure
-
-```
-app/            layout, page, global styles (design tokens + motion)
-components/     Board (state, drag and drop, stats), Drawer, icons
-lib/tasks.ts    types, columns, tags, seed data
-```
-
-## Deploy
-
-Push to GitHub and import the repo in Vercel. No configuration needed.
+- Multiple boards: rename by clicking the title, switch, add or delete from the pill next to it
+- Drag cards between columns, or focus a card and press `1` / `2` / `3` to move it; `ArrowUp` / `ArrowDown` move focus
+- Priority, assignee, effort points, Blocked flag, Markdown descriptions, checklists and comments
+- WIP limit on In progress (click the count to change it), `Archive all` on Done
+- Filters (search, tags, priority, Overdue / Due this week tiles), sorting, Board and List views
+- Command palette: `Ctrl/Cmd+K`; search: `/`
+- Undo toast after deleting or archiving
+- Export / import JSON, copy a Markdown summary
+- Data is saved in `localStorage` under `shipboard-v2`; `shipboard-v1` data is migrated automatically
 
 ## License
 

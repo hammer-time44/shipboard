@@ -1,23 +1,14 @@
 {
   "name": "shipboard",
-  "version": "1.0.0",
-  "private": true,
-  "description": "A three-column kanban board built with Next.js.",
+  "version": "2.0.0",
+  "description": "A three-column kanban board in TypeScript.",
   "license": "MIT",
+  "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "next": "^16.4.6",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "build": "tsc && rm -rf site && mkdir -p site && cp -r index.html styles.css dist site/",
+    "dev": "tsc --watch"
   },
   "devDependencies": {
-    "@types/node": "^26.6.6",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "typescript": "^7.0.2"
+    "typescript": "^6.0.3"
   }
 }
